@@ -19,4 +19,5 @@ src/codegate/utils/__init__.py
 src/codegate/utils/cache.py
 src/codegate/utils/config.py
 src/codegate/utils/helpers.py
+src/codegate/utils/history.py
 tests/test_risk_engine.py

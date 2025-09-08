@@ -53,11 +53,15 @@ class CodeGateCLI:
 
     def show_help(self):
         console.print("\n[bold]Available Commands:[/bold]")
-        console.print("  [cyan]scan [file_path][/cyan] - Analyze a specific Python file.")
-        console.print("  [cyan]paste[/cyan]             - Enter multi-line paste mode for code snippets.")
-        console.print("  [cyan]history[/cyan]           - View past scan results (coming soon).")
-        console.print("  [cyan]help[/cyan]              - Show this help message.")
-        console.print("  [cyan]:quit[/cyan]             - Exit the CodeGate CLI.\n")
+        console.print("  [cyan]scan [file_path][/cyan]     - Analyze a specific Python file.")
+        console.print("  [cyan]paste[/cyan]                 - Enter multi-line paste mode for code snippets.")
+        console.print("  [cyan]history[/cyan]               - View recent scan history.")
+        console.print("  [cyan]history --stats[/cyan]       - View scan statistics and risk distribution.")
+        console.print("  [cyan]history --details <id>[/cyan] - View detailed report for a specific scan.")
+        console.print("  [cyan]history --limit <n>[/cyan]   - Show last n scans (default: 20).")
+        console.print("  [cyan]history --clear[/cyan]       - Clear all scan history.")
+        console.print("  [cyan]help[/cyan]                  - Show this help message.")
+        console.print("  [cyan]:quit[/cyan]                 - Exit the CodeGate CLI.\n")
 
 
 def main():
