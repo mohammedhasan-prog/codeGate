@@ -15,6 +15,7 @@ src/codegate/core/gemini_analyzer.py
 src/codegate/core/preprocessor.py
 src/codegate/core/report_generator.py
 src/codegate/core/risk_engine.py
+src/codegate/core/static_analyzer.py
 src/codegate/utils/__init__.py
 src/codegate/utils/cache.py
 src/codegate/utils/config.py

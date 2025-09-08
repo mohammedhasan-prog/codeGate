@@ -12,6 +12,7 @@ from datetime import datetime
 
 from ..core.preprocessor import CodePreprocessor
 from ..core.gemini_analyzer import GeminiSecurityAnalyzer
+from ..core.static_analyzer import analyze_code_static
 from ..core.risk_engine import RiskEngine
 from ..core.report_generator import SecurityReportGenerator
 from ..utils.history import history_manager
@@ -28,10 +29,19 @@ async def process_code(code: str, file_path: str = None):
         console.print(f"[yellow]Warning: Language detected as '{processed_data['language']}'. Analysis may be inaccurate.[/yellow]")
 
     try:
+        # Run both security analysis (Gemini) and static analysis
+        console.print("[dim]Running security analysis...[/dim]")
         analyzer = GeminiSecurityAnalyzer()
         gemini_result = await analyzer.analyze(processed_data["normalized_code"])
         
-        risk_engine = RiskEngine(gemini_result, processed_data["total_lines"])
+        console.print("[dim]Running static code analysis...[/dim]")
+        static_issues = analyze_code_static(code)
+        
+        risk_engine = RiskEngine(
+            gemini_findings=gemini_result, 
+            total_lines=processed_data["total_lines"],
+            static_findings=static_issues
+        )
         
         scan_duration = time.time() - start_time
         
@@ -59,14 +69,19 @@ async def process_code(code: str, file_path: str = None):
                         'description': v.description,
                         'impact': v.impact,
                         'remediation': v.remediation,
-                        'cwe_id': v.cwe_id
+                        'cwe_id': v.cwe_id,
+                        'tool': v.tool,
+                        'issue_type': v.issue_type,
+                        'category': v.category,
+                        'metric_value': v.metric_value
                     } for v in report.vulnerabilities
                 ],
                 'summary': report.summary,
                 'scan_duration': report.scan_duration,
                 'analysis_timestamp': report.analysis_timestamp.isoformat(),
                 'dependencies_analysis': report.dependencies_analysis,
-                'total_lines': report.total_lines
+                'total_lines': report.total_lines,
+                'static_analysis_summary': report.static_analysis_summary
             }
             
             scan_id = history_manager.save_scan(report_data)
@@ -75,6 +90,8 @@ async def process_code(code: str, file_path: str = None):
 
     except Exception as e:
         console.print(f"[bold red]An error occurred during analysis: {e}[/bold red]")
+        import traceback
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")
     finally:
         CodePreprocessor.cleanup_temp_file(processed_data["temp_file_path"])
 
