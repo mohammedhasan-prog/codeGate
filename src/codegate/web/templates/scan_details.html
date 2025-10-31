@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block title %}Scan Details - CodeGate{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-0">
+                    <i class="bi bi-file-earmark-text text-primary"></i>
+                    Scan Report
+                </h1>
+                <small class="text-muted">Scan ID: {{ entry.scan_id }}</small>
+            </div>
+            <div>
+                <a href="{{ url_for('history_page') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i>
+                    Back to History
+                </a>
+                <button class="btn btn-primary" onclick="exportReport()">
+                    <i class="bi bi-download"></i>
+                    Export Report
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Report Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5 class="card-title">
+                            <i class="bi bi-info-circle"></i>
+                            Scan Information
+                        </h5>
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td class="text-muted">File:</td>
+                                <td>
+                                    {% if entry.file_path %}
+                                        <i class="bi bi-file-earmark-code text-muted"></i>
+                                        {{ entry.file_path }}
+                                    {% else %}
+                                        <i class="bi bi-clipboard text-muted"></i>
+                                        <em>Pasted Code</em>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Language:</td>
+                                <td><span class="badge bg-secondary">{{ entry.language.title() }}</span></td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Scanned:</td>
+                                <td>{{ entry.timestamp.split('T')[0] }} at {{ entry.timestamp.split('T')[1].split('.')[0] }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Duration:</td>
+                                <td>{{ "%.2f"|format(entry.scan_duration) }} seconds</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="card-title">
+                            <i class="bi bi-shield-check"></i>
+                            Security Summary
+                        </h5>
+                        <div class="row text-center">
+                            <div class="col-6 mb-3">
+                                <div class="h2 {% if entry.risk_score < 25 %}text-success{% elif entry.risk_score < 50 %}text-warning{% elif entry.risk_score < 75 %}text-danger{% else %}text-dark{% endif %}">
+                                    {{ entry.risk_score }}
+                                </div>
+                                <small class="text-muted">Risk Score</small>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <div class="h2 {% if entry.vulnerabilities_count == 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {{ entry.vulnerabilities_count }}
+                                </div>
+                                <small class="text-muted">Issues Found</small>
+                            </div>
+                        </div>
+                        <div class="progress mb-2" style="height: 10px;">
+                            <div class="progress-bar {% if entry.risk_score < 25 %}bg-success{% elif entry.risk_score < 50 %}bg-warning{% elif entry.risk_score < 75 %}bg-danger{% else %}bg-dark{% endif %}" 
+                                 style="width: {{ entry.risk_score }}%"></div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">Low Risk</small>
+                            <small class="text-muted">High Risk</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Analysis Summary -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-chat-left-text"></i>
+                    Analysis Summary
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-0">{{ entry.analysis_summary }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Vulnerabilities and Issues -->
+{% if report_data.vulnerabilities %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-exclamation-triangle text-danger"></i>
+                    Security Issues and Vulnerabilities
+                    <span class="badge bg-danger ms-2">{{ report_data.vulnerabilities|length }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                {% set security_issues = report_data.vulnerabilities|selectattr('tool', 'equalto', 'gemini')|list %}
+                {% set static_issues = report_data.vulnerabilities|selectattr('tool', 'equalto', 'static')|list %}
+                
+                {% if security_issues %}
+                    <h6 class="text-danger mb-3">
+                        <i class="bi bi-shield-x"></i>
+                        Security Vulnerabilities ({{ security_issues|length }})
+                    </h6>
+                    {% for vuln in security_issues %}
+                        <div class="card border-{% if vuln.severity.lower() == 'critical' %}dark{% elif vuln.severity.lower() == 'high' %}danger{% elif vuln.severity.lower() == 'medium' %}warning{% else %}success{% endif %} mb-3">
+                            <div class="card-header bg-{% if vuln.severity.lower() == 'critical' %}dark{% elif vuln.severity.lower() == 'high' %}danger{% elif vuln.severity.lower() == 'medium' %}warning{% else %}success{% endif %} text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-bug"></i>
+                                        {{ vuln.type.replace('_', ' ').title() }}
+                                    </h6>
+                                    <div>
+                                        <span class="badge bg-light text-dark">{{ vuln.severity.upper() }}</span>
+                                        {% if vuln.line_number %}
+                                            <span class="badge bg-light text-dark">Line {{ vuln.line_number }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-2">{{ vuln.description }}</p>
+                                
+                                {% if vuln.code_snippet %}
+                                    <h6>Code Snippet:</h6>
+                                    <pre class="bg-light p-2 rounded"><code class="language-python">{{ vuln.code_snippet }}</code></pre>
+                                {% endif %}
+                                
+                                {% if vuln.impact %}
+                                    <div class="row mt-3">
+                                        <div class="col-md-6">
+                                            <h6 class="text-danger">Impact:</h6>
+                                            <p class="small">{{ vuln.impact }}</p>
+                                        </div>
+                                        {% if vuln.remediation %}
+                                            <div class="col-md-6">
+                                                <h6 class="text-success">Remediation:</h6>
+                                                <p class="small">{{ vuln.remediation }}</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                                
+                                {% if vuln.cwe_id %}
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <i class="bi bi-link-45deg"></i>
+                                            Reference: <a href="https://cwe.mitre.org/data/definitions/{{ vuln.cwe_id.replace('CWE-', '') }}.html" target="_blank">{{ vuln.cwe_id }}</a>
+                                        </small>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
+                {% if static_issues %}
+                    <h6 class="text-warning mb-3 mt-4">
+                        <i class="bi bi-code-slash"></i>
+                        Code Quality Issues ({{ static_issues|length }})
+                    </h6>
+                    
+                    {% set issue_types = static_issues|groupby('category') %}
+                    {% for category, issues in issue_types %}
+                        <div class="mb-4">
+                            <h6 class="text-info">
+                                {% if category == 'logic' %}
+                                    <i class="bi bi-cpu"></i> Logic Issues
+                                {% elif category == 'performance' %}
+                                    <i class="bi bi-speedometer2"></i> Performance Issues
+                                {% elif category == 'complexity' %}
+                                    <i class="bi bi-diagram-3"></i> Complexity Issues
+                                {% else %}
+                                    <i class="bi bi-tools"></i> Code Quality Issues
+                                {% endif %}
+                                <span class="badge bg-info ms-2">{{ issues|list|length }}</span>
+                            </h6>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Severity</th>
+                                            <th>Line</th>
+                                            <th>Issue Type</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for issue in issues %}
+                                        <tr>
+                                            <td>
+                                                <span class="badge bg-{% if issue.severity.lower() == 'high' %}danger{% elif issue.severity.lower() == 'medium' %}warning{% else %}secondary{% endif %}">
+                                                    {{ issue.severity.upper() }}
+                                                </span>
+                                            </td>
+                                            <td>{{ issue.line_number or 'N/A' }}</td>
+                                            <td>{{ issue.type.replace('_', ' ').title() }}</td>
+                                            <td>{{ issue.description }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Static Analysis Summary -->
+{% if report_data.static_analysis_summary %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-graph-up"></i>
+                    Static Analysis Summary
+                </h5>
+            </div>
+            <div class="card-body">
+                {% set summary = report_data.static_analysis_summary %}
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Issue Distribution</h6>
+                        <ul class="list-unstyled">
+                            {% if summary and summary.get('by_type') %}
+                                {% for type, count in summary.by_type.items() %}
+                                    <li class="mb-1">
+                                        <i class="bi bi-dot"></i>
+                                        {{ type.title() }}: <span class="badge bg-secondary">{{ count }}</span>
+                                    </li>
+                                {% endfor %}
+                            {% else %}
+                                <li class="text-muted">No issues found</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Severity Breakdown</h6>
+                        <ul class="list-unstyled">
+                            {% if summary and summary.get('by_severity') %}
+                                {% for severity, count in summary.by_severity.items() %}
+                                    <li class="mb-1">
+                                        <i class="bi bi-dot"></i>
+                                        {{ severity.title() }}: 
+                                    <span class="badge bg-{% if severity.lower() == 'high' %}danger{% elif severity.lower() == 'medium' %}warning{% else %}secondary{% endif %}">
+                                        {{ count }}
+                                    </span>
+                                </li>
+                                {% endfor %}
+                            {% else %}
+                                <li class="text-muted">No issues found</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Dependencies Analysis -->
+{% if report_data.dependencies_analysis %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-box"></i>
+                    Dependencies Analysis
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if report_data.dependencies_analysis.detected_imports %}
+                    <h6>Detected Imports:</h6>
+                    <div class="mb-3">
+                        {% for import in report_data.dependencies_analysis.detected_imports %}
+                            <span class="badge bg-light text-dark border me-1 mb-1">{{ import }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                
+                {% if report_data.dependencies_analysis.security_notes %}
+                    <h6>Security Notes:</h6>
+                    <p class="mb-0">{{ report_data.dependencies_analysis.security_notes }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Technical Details -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-gear"></i>
+                    Technical Details
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6>Scan Metrics</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>Total Lines:</strong> {{ report_data.total_lines or 'N/A' }}</li>
+                            <li><strong>Analysis Time:</strong> {{ "%.2f"|format(entry.scan_duration) }}s</li>
+                            <li><strong>Risk Score:</strong> {{ entry.risk_score }}/100</li>
+                            <li><strong>Issues Found:</strong> {{ entry.vulnerabilities_count }}</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Analysis Tools</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check-circle text-success"></i> Gemini LLM Security Analysis</li>
+                            <li><i class="bi bi-check-circle text-success"></i> Static Code Analysis</li>
+                            <li><i class="bi bi-check-circle text-success"></i> Risk Assessment Engine</li>
+                            <li><i class="bi bi-check-circle text-success"></i> Dependency Scanning</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4">
+                        <h6>Report Info</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>Generated:</strong> {{ entry.timestamp.split('T')[0] }}</li>
+                            <li><strong>Format:</strong> Web Report</li>
+                            <li><strong>Version:</strong> CodeGate v1.0</li>
+                            <li><strong>Scan ID:</strong> {{ entry.scan_id }}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function exportReport() {
+    // Generate a simple text report
+    const reportData = {
+        scanId: '{{ entry.scan_id }}',
+        timestamp: '{{ entry.timestamp }}',
+        file: '{{ entry.file_path or "Pasted Code" }}',
+        riskScore: {{ entry.risk_score }},
+        vulnerabilities: {{ entry.vulnerabilities_count }},
+        summary: `{{ entry.analysis_summary }}`
+    };
+    
+    let report = `CodeGate Security Analysis Report\n`;
+    report += `=====================================\n\n`;
+    report += `Scan ID: ${reportData.scanId}\n`;
+    report += `Date: ${reportData.timestamp.split('T')[0]}\n`;
+    report += `Time: ${reportData.timestamp.split('T')[1].split('.')[0]}\n`;
+    report += `File: ${reportData.file}\n`;
+    report += `Risk Score: ${reportData.riskScore}/100\n`;
+    report += `Vulnerabilities Found: ${reportData.vulnerabilities}\n\n`;
+    report += `Summary:\n${reportData.summary}\n\n`;
+    report += `Generated by CodeGate v1.0 - Security Auditor\n`;
+    
+    // Create download
+    const blob = new Blob([report], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `codegate_report_${reportData.scanId}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+// Initialize Prism.js for syntax highlighting
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof Prism !== 'undefined') {
+        Prism.highlightAll();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - CodeGate{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0">
+                <i class="bi bi-house text-primary"></i>
+                Dashboard
+            </h1>
+            <a href="{{ url_for('scan_page') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i>
+                New Scan
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="card-title text-muted mb-1">Total Scans</h5>
+                        <h2 class="text-primary mb-0">{{ stats.total_scans or 0 }}</h2>
+                    </div>
+                    <div class="text-primary fs-1">
+                        <i class="bi bi-search"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="card-title text-muted mb-1">Vulnerabilities</h5>
+                        <h2 class="text-danger mb-0">{{ stats.total_vulnerabilities or 0 }}</h2>
+                    </div>
+                    <div class="text-danger fs-1">
+                        <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="card-title text-muted mb-1">Avg Risk Score</h5>
+                        <h2 class="text-warning mb-0">{{ "%.1f"|format(stats.average_risk_score or 0) }}</h2>
+                    </div>
+                    <div class="text-warning fs-1">
+                        <i class="bi bi-speedometer2"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="card-title text-muted mb-1">Security Status</h5>
+                        <h5 class="mb-0">
+                            {% if stats.total_scans and stats.average_risk_score < 25 %}
+                                <span class="badge bg-success">Good</span>
+                            {% elif stats.total_scans and stats.average_risk_score < 50 %}
+                                <span class="badge bg-warning">Medium</span>
+                            {% elif stats.total_scans and stats.average_risk_score < 75 %}
+                                <span class="badge bg-danger">High</span>
+                            {% elif stats.total_scans %}
+                                <span class="badge bg-dark">Critical</span>
+                            {% else %}
+                                <span class="badge bg-secondary">No Data</span>
+                            {% endif %}
+                        </h5>
+                    </div>
+                    <div class="fs-1">
+                        {% if stats.total_scans and stats.average_risk_score < 25 %}
+                            <i class="bi bi-shield-check text-success"></i>
+                        {% elif stats.total_scans and stats.average_risk_score < 50 %}
+                            <i class="bi bi-shield-exclamation text-warning"></i>
+                        {% else %}
+                            <i class="bi bi-shield-x text-danger"></i>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Risk Distribution Chart -->
+{% if stats.total_scans %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-pie-chart"></i>
+                    Risk Distribution
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="riskChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('scan_page') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i>
+                        Start New Security Scan
+                    </a>
+                    <a href="{{ url_for('history_page') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-clock-history"></i>
+                        View All Scan History
+                    </a>
+                    <button class="btn btn-outline-info" onclick="downloadReport()">
+                        <i class="bi bi-download"></i>
+                        Export Security Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Recent Scans -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-clock-history"></i>
+                    Recent Scans
+                </h5>
+                <a href="{{ url_for('history_page') }}" class="btn btn-sm btn-outline-primary">
+                    View All
+                </a>
+            </div>
+            <div class="card-body">
+                {% if recent_scans %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>File</th>
+                                    <th>Risk Score</th>
+                                    <th>Vulnerabilities</th>
+                                    <th>Duration</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for scan in recent_scans %}
+                                <tr>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ scan.timestamp.split('T')[0] }}<br>
+                                            {{ scan.timestamp.split('T')[1].split('.')[0] }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-file-earmark-code text-muted me-2"></i>
+                                            <span>
+                                                {% if scan.file_path %}
+                                                    {{ scan.file_path.split('/')[-1] if '/' in scan.file_path else scan.file_path }}
+                                                {% else %}
+                                                    <em>Pasted Code</em>
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if scan.risk_score < 25 %}bg-success{% elif scan.risk_score < 50 %}bg-warning{% elif scan.risk_score < 75 %}bg-danger{% else %}bg-dark{% endif %}">
+                                            {{ scan.risk_score }}/100
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if scan.vulnerabilities_count == 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                            {{ scan.vulnerabilities_count }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ "%.1f"|format(scan.scan_duration) }}s</small>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('scan_details', scan_id=scan.scan_id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i>
+                                            View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="mb-3">
+                            <i class="bi bi-search display-1 text-muted"></i>
+                        </div>
+                        <h5 class="text-muted">No scans yet</h5>
+                        <p class="text-muted">Start your first security scan to see results here.</p>
+                        <a href="{{ url_for('scan_page') }}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i>
+                            Start First Scan
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if stats.total_scans %}
+<script>
+// Risk Distribution Chart
+const ctx = document.getElementById('riskChart').getContext('2d');
+const riskChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Low Risk', 'Medium Risk', 'High Risk', 'Critical Risk'],
+        datasets: [{
+            data: [
+                {{ stats.risk_distribution.low or 0 }},
+                {{ stats.risk_distribution.medium or 0 }},
+                {{ stats.risk_distribution.high or 0 }},
+                {{ stats.risk_distribution.critical or 0 }}
+            ],
+            backgroundColor: [
+                '#28a745',
+                '#ffc107',
+                '#dc3545',
+                '#343a40'
+            ],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 20,
+                    usePointStyle: true
+                }
+            }
+        }
+    }
+});
+
+// Download report functionality
+function downloadReport() {
+    // Create a simple CSV report
+    const data = [
+        ['Total Scans', '{{ stats.total_scans }}'],
+        ['Total Vulnerabilities', '{{ stats.total_vulnerabilities }}'],
+        ['Average Risk Score', '{{ "%.1f"|format(stats.average_risk_score) }}'],
+        ['Low Risk Scans', '{{ stats.risk_distribution.low }}'],
+        ['Medium Risk Scans', '{{ stats.risk_distribution.medium }}'],
+        ['High Risk Scans', '{{ stats.risk_distribution.high }}'],
+        ['Critical Risk Scans', '{{ stats.risk_distribution.critical }}']
+    ];
+    
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Metric,Value\n";
+    data.forEach(row => {
+        csvContent += row.join(",") + "\n";
+    });
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "codegate_security_report.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+</script>
+{% endif %}
+{% endblock %}

@@ -7,6 +7,8 @@ from rich.text import Text
 import asyncio
 import time
 import aiofiles
+import subprocess
+import sys
 from pathlib import Path
 from datetime import datetime
 
@@ -326,7 +328,49 @@ def get_risk_level_color(level: str) -> str:
     }
     return colors.get(level, 'white')
 
+@click.command()
+@click.option('--host', default='127.0.0.1', help='Host to bind to (default: 127.0.0.1)')
+@click.option('--port', default=5000, help='Port to bind to (default: 5000)')
+@click.option('--debug', is_flag=True, help='Enable debug mode')
+@click.option('--public', is_flag=True, help='Allow external connections')
+def web(host, port, debug, public):
+    """Launch CodeGate Web Interface"""
+    try:
+        # Import here to avoid dependency issues if Flask isn't installed
+        web_launcher_path = Path(__file__).parent.parent / "web" / "launcher.py"
+        
+        # Build command arguments
+        cmd = [sys.executable, str(web_launcher_path)]
+        cmd.extend(['--host', host])
+        cmd.extend(['--port', str(port)])
+        
+        if debug:
+            cmd.append('--debug')
+        if public:
+            cmd.append('--public')
+        
+        console.print(f"[green]🚀 Starting CodeGate Web Interface...[/green]")
+        console.print(f"[cyan]📍 URL: http://{host if host != '0.0.0.0' else 'localhost'}:{port}[/cyan]")
+        console.print("[dim]💡 Use Ctrl+C to stop the server[/dim]")
+        
+        # Launch the web interface
+        subprocess.run(cmd)
+        
+    except ImportError:
+        console.print("[red]❌ Web interface dependencies not installed.[/red]")
+        console.print("[yellow]Install with: pip install flask flask-socketio eventlet[/yellow]")
+    except KeyboardInterrupt:
+        console.print("[green]👋 CodeGate Web Interface stopped[/green]")
+    except Exception as e:
+        console.print(f"[red]❌ Error starting web interface: {e}[/red]")
 
 cli.add_command(scan)
 cli.add_command(paste)
 cli.add_command(history)
+cli.add_command(web)
+
+
+cli.add_command(scan)
+cli.add_command(paste)
+cli.add_command(history)
+cli.add_command(web)

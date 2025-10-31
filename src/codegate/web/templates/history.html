@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+
+{% block title %}Scan History - CodeGate{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0">
+                <i class="bi bi-clock-history text-primary"></i>
+                Scan History
+            </h1>
+            <div>
+                <a href="{{ url_for('scan_page') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i>
+                    New Scan
+                </a>
+                <button class="btn btn-outline-danger ms-2" onclick="clearHistory()">
+                    <i class="bi bi-trash"></i>
+                    Clear History
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Summary -->
+{% if stats.total_scans %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <h3 class="text-primary mb-1">{{ stats.total_scans }}</h3>
+                <small class="text-muted">Total Scans</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <h3 class="text-danger mb-1">{{ stats.total_vulnerabilities }}</h3>
+                <small class="text-muted">Vulnerabilities Found</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <h3 class="text-warning mb-1">{{ "%.1f"|format(stats.average_risk_score) }}</h3>
+                <small class="text-muted">Avg Risk Score</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                {% set high_risk = stats.risk_distribution.high + stats.risk_distribution.critical %}
+                <h3 class="{% if high_risk > 0 %}text-danger{% else %}text-success{% endif %} mb-1">{{ high_risk }}</h3>
+                <small class="text-muted">High Risk Scans</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Filters and Controls -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <label for="limitSelect" class="form-label">Show entries:</label>
+                        <select class="form-select" id="limitSelect" onchange="updateLimit()">
+                            <option value="10" {% if limit == 10 %}selected{% endif %}>10</option>
+                            <option value="20" {% if limit == 20 %}selected{% endif %}>20</option>
+                            <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="riskFilter" class="form-label">Filter by risk:</label>
+                        <select class="form-select" id="riskFilter" onchange="filterByRisk()">
+                            <option value="all">All Risk Levels</option>
+                            <option value="low">Low Risk (0-24)</option>
+                            <option value="medium">Medium Risk (25-49)</option>
+                            <option value="high">High Risk (50-74)</option>
+                            <option value="critical">Critical Risk (75-100)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="searchInput" class="form-label">Search files:</label>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search by filename..." onkeyup="searchScans()">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scan History Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-list-ul"></i>
+                    Recent Scans
+                    {% if scans %}
+                        <span class="badge bg-primary ms-2">{{ scans|length }}</span>
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if scans %}
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="scansTable">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <i class="bi bi-calendar"></i>
+                                        Date/Time
+                                    </th>
+                                    <th>
+                                        <i class="bi bi-file-earmark-code"></i>
+                                        File
+                                    </th>
+                                    <th>
+                                        <i class="bi bi-speedometer2"></i>
+                                        Risk Score
+                                    </th>
+                                    <th>
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                        Vulnerabilities
+                                    </th>
+                                    <th>
+                                        <i class="bi bi-clock"></i>
+                                        Duration
+                                    </th>
+                                    <th>
+                                        <i class="bi bi-chat-left-text"></i>
+                                        Summary
+                                    </th>
+                                    <th>
+                                        <i class="bi bi-gear"></i>
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for scan in scans %}
+                                <tr data-risk="{{ scan.risk_score }}" data-filename="{{ scan.file_path or '' }}">
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <span class="fw-bold">{{ scan.timestamp.split('T')[0] }}</span>
+                                            <small class="text-muted">{{ scan.timestamp.split('T')[1].split('.')[0] }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-file-earmark-code text-muted me-2"></i>
+                                            <div>
+                                                {% if scan.file_path %}
+                                                    <span class="fw-bold">{{ scan.file_path.split('/')[-1] if '/' in scan.file_path else scan.file_path }}</span>
+                                                    {% if '/' in scan.file_path %}
+                                                        <br><small class="text-muted">{{ scan.file_path }}</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <em class="text-muted">Pasted Code</em>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge fs-6 {% if scan.risk_score < 25 %}bg-success{% elif scan.risk_score < 50 %}bg-warning{% elif scan.risk_score < 75 %}bg-danger{% else %}bg-dark{% endif %}">
+                                                {{ scan.risk_score }}/100
+                                            </span>
+                                            <div class="progress ms-2" style="width: 60px; height: 6px;">
+                                                <div class="progress-bar {% if scan.risk_score < 25 %}bg-success{% elif scan.risk_score < 50 %}bg-warning{% elif scan.risk_score < 75 %}bg-danger{% else %}bg-dark{% endif %}" 
+                                                     style="width: {{ scan.risk_score }}%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if scan.vulnerabilities_count == 0 %}bg-success{% elif scan.vulnerabilities_count < 5 %}bg-warning{% else %}bg-danger{% endif %} fs-6">
+                                            {{ scan.vulnerabilities_count }}
+                                            {% if scan.vulnerabilities_count == 1 %}issue{% else %}issues{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">{{ "%.1f"|format(scan.scan_duration) }}s</span>
+                                    </td>
+                                    <td>
+                                        <div style="max-width: 200px;">
+                                            <small class="text-muted">{{ scan.analysis_summary[:100] }}{% if scan.analysis_summary|length > 100 %}...{% endif %}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('scan_details', scan_id=scan.scan_id) }}" 
+                                               class="btn btn-outline-primary" title="View Details">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <button class="btn btn-outline-secondary" 
+                                                    onclick="exportScan('{{ scan.scan_id }}')" title="Export">
+                                                <i class="bi bi-download"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" 
+                                                    onclick="deleteScan('{{ scan.scan_id }}')" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination would go here if needed -->
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                Showing {{ scans|length }} of {{ stats.total_scans or 0 }} total scans
+                            </small>
+                            {% if limit < (stats.total_scans or 0) %}
+                                <a href="{{ url_for('history_page', limit=stats.total_scans) }}" class="btn btn-sm btn-outline-primary">
+                                    View All Scans
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <div class="mb-3">
+                            <i class="bi bi-clock-history display-1 text-muted"></i>
+                        </div>
+                        <h4 class="text-muted">No scan history found</h4>
+                        <p class="text-muted">Start analyzing code to build your security scan history.</p>
+                        <a href="{{ url_for('scan_page') }}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i>
+                            Start First Scan
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle text-warning"></i>
+                    Confirm Deletion
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this scan? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="bi bi-trash"></i>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Clear History Modal -->
+<div class="modal fade" id="clearHistoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle text-danger"></i>
+                    Clear All History
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-danger fw-bold">Are you sure you want to clear all scan history?</p>
+                <p>This will permanently delete all scan records and cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmClearHistory()">
+                    <i class="bi bi-trash"></i>
+                    Clear All History
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function updateLimit() {
+    const limit = document.getElementById('limitSelect').value;
+    window.location.href = `{{ url_for('history_page') }}?limit=${limit}`;
+}
+
+function filterByRisk() {
+    const filter = document.getElementById('riskFilter').value;
+    const rows = document.querySelectorAll('#scansTable tbody tr');
+    
+    rows.forEach(row => {
+        const riskScore = parseInt(row.getAttribute('data-risk'));
+        let show = true;
+        
+        if (filter === 'low' && riskScore >= 25) show = false;
+        else if (filter === 'medium' && (riskScore < 25 || riskScore >= 50)) show = false;
+        else if (filter === 'high' && (riskScore < 50 || riskScore >= 75)) show = false;
+        else if (filter === 'critical' && riskScore < 75) show = false;
+        
+        row.style.display = show ? '' : 'none';
+    });
+}
+
+function searchScans() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('#scansTable tbody tr');
+    
+    rows.forEach(row => {
+        const filename = row.getAttribute('data-filename').toLowerCase();
+        const show = filename.includes(searchTerm);
+        row.style.display = show ? '' : 'none';
+    });
+}
+
+function exportScan(scanId) {
+    // For now, just open the detailed view in a new tab
+    window.open(`/history/${scanId}`, '_blank');
+}
+
+function deleteScan(scanId) {
+    // Store scan ID for deletion
+    document.getElementById('confirmDeleteBtn').setAttribute('data-scan-id', scanId);
+    
+    // Show confirmation modal
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    deleteModal.show();
+}
+
+function confirmDelete() {
+    const scanId = document.getElementById('confirmDeleteBtn').getAttribute('data-scan-id');
+    
+    // For now, just show an alert (would implement actual deletion API)
+    alert(`Delete scan ${scanId} functionality would be implemented here.`);
+    
+    // Hide modal
+    const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+    deleteModal.hide();
+}
+
+function clearHistory() {
+    const clearModal = new bootstrap.Modal(document.getElementById('clearHistoryModal'));
+    clearModal.show();
+}
+
+function confirmClearHistory() {
+    // Would implement actual history clearing API call
+    alert('Clear history functionality would be implemented here.');
+    
+    // Hide modal
+    const clearModal = bootstrap.Modal.getInstance(document.getElementById('clearHistoryModal'));
+    clearModal.hide();
+}
+
+// Set up delete confirmation
+document.getElementById('confirmDeleteBtn').addEventListener('click', confirmDelete);
+</script>
+{% endblock %}

@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+
+{% block title %}Code Scanner - CodeGate{% endblock %}
+
+{% block content %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0">
+                <i class="bi bi-search text-primary"></i>
+                Code Security Scanner
+            </h1>
+            <a href="{{ url_for('history_page') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-clock-history"></i>
+                View History
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Code Input Section -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-code-slash"></i>
+                        Python Code Input
+                    </h5>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadExample()">
+                            <i class="bi bi-lightning"></i>
+                            Load Example
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearCode()">
+                            <i class="bi bi-trash"></i>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <form id="scanForm">
+                    <div class="mb-3">
+                        <label for="fileName" class="form-label">File Name (Optional)</label>
+                        <input type="text" class="form-control" id="fileName" placeholder="example.py" value="web_upload.py">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="codeInput" class="form-label">Python Code</label>
+                        <textarea class="form-control font-monospace" id="codeInput" rows="20" 
+                                  placeholder="# Paste your Python code here for security analysis
+import os
+import subprocess
+
+def example_function(user_input):
+    # This code will be analyzed for security vulnerabilities
+    result = os.system(f'echo {user_input}')
+    return result"></textarea>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg" id="scanButton">
+                            <i class="bi bi-search"></i>
+                            <span class="button-text">Analyze Code Security</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Analysis Status and Results -->
+    <div class="col-lg-4">
+        <!-- Analysis Status -->
+        <div class="card border-0 shadow-sm mb-4" id="statusCard" style="display: none;">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-gear"></i>
+                    Analysis Status
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-muted" id="statusText">Initializing...</small>
+                        <small class="text-muted" id="progressPercent">0%</small>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             id="progressBar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div class="analysis-stages">
+                    <div class="stage-item" id="stage-preprocessing">
+                        <i class="bi bi-circle text-muted"></i>
+                        <span class="text-muted">Code Preprocessing</span>
+                    </div>
+                    <div class="stage-item" id="stage-static">
+                        <i class="bi bi-circle text-muted"></i>
+                        <span class="text-muted">Static Analysis</span>
+                    </div>
+                    <div class="stage-item" id="stage-gemini">
+                        <i class="bi bi-circle text-muted"></i>
+                        <span class="text-muted">Gemini Security Scan</span>
+                    </div>
+                    <div class="stage-item" id="stage-risk">
+                        <i class="bi bi-circle text-muted"></i>
+                        <span class="text-muted">Risk Assessment</span>
+                    </div>
+                    <div class="stage-item" id="stage-complete">
+                        <i class="bi bi-circle text-muted"></i>
+                        <span class="text-muted">Report Generation</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Results Preview -->
+        <div class="card border-0 shadow-sm" id="resultsPreview" style="display: none;">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-check-circle"></i>
+                    Quick Results
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center">
+                    <div class="mb-3">
+                        <div class="display-4" id="riskScoreDisplay">0</div>
+                        <small class="text-muted">Risk Score</small>
+                    </div>
+                    
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="h4 text-danger mb-0" id="vulnCount">0</div>
+                            <small class="text-muted">Vulnerabilities</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="h4 text-info mb-0" id="scanDuration">0s</div>
+                            <small class="text-muted">Duration</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <button class="btn btn-primary" id="viewReportBtn" onclick="viewFullReport()" disabled>
+                            <i class="bi bi-eye"></i>
+                            View Full Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scanner Tips -->
+        <div class="card border-0 shadow-sm" id="tipsCard">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightbulb"></i>
+                    Scanner Tips
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <i class="bi bi-check-circle text-success"></i>
+                        <small>Paste complete Python functions or modules</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-check-circle text-success"></i>
+                        <small>Include import statements for accurate analysis</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-check-circle text-success"></i>
+                        <small>Analysis covers security vulnerabilities and code quality</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-check-circle text-success"></i>
+                        <small>Real-time progress updates during analysis</small>
+                    </li>
+                    <li>
+                        <i class="bi bi-check-circle text-success"></i>
+                        <small>Results are automatically saved to history</small>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle text-danger"></i>
+                    Analysis Error
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="errorMessage">An error occurred during analysis.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="retryAnalysis()">
+                    <i class="bi bi-arrow-clockwise"></i>
+                    Retry
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let socket = io();
+let currentScanId = null;
+let scanInProgress = false;
+
+// Socket event handlers
+socket.on('connect', function() {
+    console.log('Connected to CodeGate WebSocket');
+});
+
+socket.on('scan_progress', function(data) {
+    updateProgress(data);
+});
+
+socket.on('scan_complete', function(data) {
+    handleScanComplete(data);
+});
+
+socket.on('scan_error', function(data) {
+    handleScanError(data);
+});
+
+// Form submission
+document.getElementById('scanForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    startAnalysis();
+});
+
+function startAnalysis() {
+    if (scanInProgress) return;
+    
+    const code = document.getElementById('codeInput').value.trim();
+    if (!code) {
+        alert('Please enter some Python code to analyze.');
+        return;
+    }
+    
+    const fileName = document.getElementById('fileName').value.trim() || 'web_upload.py';
+    
+    scanInProgress = true;
+    updateScanButton(true);
+    showStatusCard();
+    hideResultsPreview();
+    resetProgress();
+    
+    // Send scan request
+    fetch('/api/scan', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            code: code,
+            file_name: fileName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        currentScanId = data.scan_id;
+        console.log('Scan started:', data);
+    })
+    .catch(error => {
+        console.error('Error starting scan:', error);
+        handleScanError({error: error.message});
+    });
+}
+
+function updateProgress(data) {
+    if (data.scan_id !== currentScanId) return;
+    
+    const progressBar = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    const statusText = document.getElementById('statusText');
+    
+    progressBar.style.width = data.progress + '%';
+    progressPercent.textContent = data.progress + '%';
+    statusText.textContent = data.message || 'Processing...';
+    
+    // Update stage indicators
+    const stageMap = {
+        'preprocessing': 'stage-preprocessing',
+        'static_analysis': 'stage-static',
+        'gemini_analysis': 'stage-gemini',
+        'risk_assessment': 'stage-risk',
+        'complete': 'stage-complete'
+    };
+    
+    const stageId = stageMap[data.stage];
+    if (stageId) {
+        updateStageStatus(stageId, 'active');
+        
+        // Mark previous stages as complete
+        for (const [stage, id] of Object.entries(stageMap)) {
+            if (stage === data.stage) break;
+            updateStageStatus(id, 'complete');
+        }
+    }
+}
+
+function updateStageStatus(stageId, status) {
+    const element = document.getElementById(stageId);
+    if (!element) return;
+    
+    const icon = element.querySelector('i');
+    const text = element.querySelector('span');
+    
+    if (status === 'active') {
+        icon.className = 'bi bi-gear-fill text-primary';
+        text.className = 'text-primary fw-bold';
+    } else if (status === 'complete') {
+        icon.className = 'bi bi-check-circle-fill text-success';
+        text.className = 'text-success';
+    }
+}
+
+function handleScanComplete(data) {
+    if (data.scan_id !== currentScanId) return;
+    
+    scanInProgress = false;
+    updateScanButton(false);
+    
+    // Update all stages to complete
+    const stages = ['stage-preprocessing', 'stage-static', 'stage-gemini', 'stage-risk', 'stage-complete'];
+    stages.forEach(stage => updateStageStatus(stage, 'complete'));
+    
+    // Update progress to 100%
+    document.getElementById('progressBar').style.width = '100%';
+    document.getElementById('progressPercent').textContent = '100%';
+    document.getElementById('statusText').textContent = 'Analysis completed successfully!';
+    
+    // Show results preview
+    showResultsPreview(data);
+    
+    console.log('Scan completed:', data);
+}
+
+function handleScanError(data) {
+    scanInProgress = false;
+    updateScanButton(false);
+    
+    // Show error modal
+    document.getElementById('errorMessage').textContent = data.error || 'An unknown error occurred.';
+    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+    errorModal.show();
+    
+    console.error('Scan error:', data);
+}
+
+function showResultsPreview(data) {
+    const report = data.report;
+    
+    document.getElementById('riskScoreDisplay').textContent = report.risk_score;
+    document.getElementById('vulnCount').textContent = report.vulnerabilities_count;
+    document.getElementById('scanDuration').textContent = report.scan_duration.toFixed(1) + 's';
+    
+    // Update risk score color
+    const riskDisplay = document.getElementById('riskScoreDisplay');
+    if (report.risk_score < 25) {
+        riskDisplay.className = 'display-4 text-success';
+    } else if (report.risk_score < 50) {
+        riskDisplay.className = 'display-4 text-warning';
+    } else if (report.risk_score < 75) {
+        riskDisplay.className = 'display-4 text-danger';
+    } else {
+        riskDisplay.className = 'display-4 text-dark';
+    }
+    
+    // Enable view report button
+    document.getElementById('viewReportBtn').disabled = false;
+    document.getElementById('viewReportBtn').setAttribute('data-scan-id', data.saved_scan_id);
+    
+    // Show results card
+    document.getElementById('resultsPreview').style.display = 'block';
+    document.getElementById('tipsCard').style.display = 'none';
+}
+
+function updateScanButton(scanning) {
+    const button = document.getElementById('scanButton');
+    const buttonText = button.querySelector('.button-text');
+    
+    if (scanning) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Analyzing Code...';
+    } else {
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-search"></i> <span class="button-text">Analyze Code Security</span>';
+    }
+}
+
+function showStatusCard() {
+    document.getElementById('statusCard').style.display = 'block';
+    document.getElementById('tipsCard').style.display = 'none';
+}
+
+function hideResultsPreview() {
+    document.getElementById('resultsPreview').style.display = 'none';
+}
+
+function resetProgress() {
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('progressPercent').textContent = '0%';
+    document.getElementById('statusText').textContent = 'Initializing...';
+    
+    // Reset all stage indicators
+    const stages = ['stage-preprocessing', 'stage-static', 'stage-gemini', 'stage-risk', 'stage-complete'];
+    stages.forEach(stageId => {
+        const element = document.getElementById(stageId);
+        const icon = element.querySelector('i');
+        const text = element.querySelector('span');
+        icon.className = 'bi bi-circle text-muted';
+        text.className = 'text-muted';
+    });
+}
+
+function viewFullReport() {
+    const scanId = document.getElementById('viewReportBtn').getAttribute('data-scan-id');
+    if (scanId) {
+        window.open(`/history/${scanId}`, '_blank');
+    }
+}
+
+function retryAnalysis() {
+    const errorModal = bootstrap.Modal.getInstance(document.getElementById('errorModal'));
+    errorModal.hide();
+    startAnalysis();
+}
+
+function loadExample() {
+    const exampleCode = `import os
+import subprocess
+import pickle
+
+def vulnerable_function(user_input):
+    # Command injection vulnerability
+    result = os.system(f"echo {user_input}")
+    return result
+
+def file_operations(filename):
+    # Path traversal vulnerability
+    with open(f"/data/{filename}", "r") as f:
+        return f.read()
+
+def insecure_deserialization(data):
+    # Insecure deserialization
+    return pickle.loads(data)
+
+def sql_query_builder(user_id, table_name):
+    # SQL injection vulnerability
+    query = f"SELECT * FROM {table_name} WHERE id = {user_id}"
+    return query
+
+# Performance issues
+def inefficient_loop():
+    result = []
+    for i in range(1000):
+        for j in range(100):
+            if str(i) in str(j):  # Inefficient string operations
+                result.append(i * j)
+    return result`;
+
+    document.getElementById('codeInput').value = exampleCode;
+    document.getElementById('fileName').value = 'vulnerable_example.py';
+}
+
+function clearCode() {
+    document.getElementById('codeInput').value = '';
+    document.getElementById('fileName').value = 'web_upload.py';
+    
+    // Hide status and results
+    document.getElementById('statusCard').style.display = 'none';
+    document.getElementById('resultsPreview').style.display = 'none';
+    document.getElementById('tipsCard').style.display = 'block';
+}
+</script>
+
+<style>
+.stage-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.stage-item i {
+    margin-right: 8px;
+}
+
+.font-monospace {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9rem;
+}
+
+#codeInput {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+
+#codeInput:focus {
+    background-color: #fff;
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.progress {
+    height: 8px;
+}
+
+.card {
+    transition: all 0.3s ease;
+}
+</style>
+{% endblock %}

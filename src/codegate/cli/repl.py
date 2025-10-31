@@ -60,6 +60,7 @@ class CodeGateCLI:
         console.print("  [cyan]history --details <id>[/cyan] - View detailed report for a specific scan.")
         console.print("  [cyan]history --limit <n>[/cyan]   - Show last n scans (default: 20).")
         console.print("  [cyan]history --clear[/cyan]       - Clear all scan history.")
+        console.print("  [cyan]web[/cyan]                   - Launch CodeGate Web Interface.")
         console.print("  [cyan]help[/cyan]                  - Show this help message.")
         console.print("  [cyan]:quit[/cyan]                 - Exit the CodeGate CLI.\n")
 

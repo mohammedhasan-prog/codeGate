@@ -5,24 +5,57 @@ import os
 import re
 
 class CodePreprocessor:
-    def __init__(self, code: str, file_path: str = None):
+    def __init__(self, code: str = None, file_path: str = None):
         self.code = code
         self.file_path = file_path
 
-    async def process(self):
-        normalized_code = self._normalize_code(self.code)
-        language = self._detect_language()
-        dependencies = self._detect_dependencies(normalized_code)
+    async def preprocess_code(self, code: str = None, file_path: str = None):
+        """Process code for analysis
         
-        temp_file_path = await self._create_temp_file(normalized_code)
+        Args:
+            code: Code to process (if not provided in __init__)
+            file_path: Optional file path
+            
+        Returns:
+            Dict with processing results
+        """
+        # Use provided code or fallback to instance code
+        if code is not None:
+            self.code = code
+        if file_path is not None:
+            self.file_path = file_path
+            
+        if self.code is None:
+            return {
+                "success": False,
+                "error": "No code provided for preprocessing"
+            }
+        
+        try:
+            normalized_code = self._normalize_code(self.code)
+            language = self._detect_language()
+            dependencies = self._detect_dependencies(normalized_code)
+            
+            temp_file_path = await self._create_temp_file(normalized_code)
 
-        return {
-            "normalized_code": normalized_code,
-            "language": language,
-            "dependencies": dependencies,
-            "temp_file_path": temp_file_path,
-            "total_lines": len(self.code.splitlines())
-        }
+            return {
+                "success": True,
+                "content": normalized_code,
+                "normalized_code": normalized_code,
+                "language": language,
+                "dependencies": dependencies,
+                "temp_file_path": temp_file_path,
+                "total_lines": len(self.code.splitlines())
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Preprocessing failed: {str(e)}"
+            }
+
+    async def process(self):
+        """Legacy method for backward compatibility"""
+        return await self.preprocess_code()
 
     def _normalize_code(self, code: str) -> str:
         # Simple normalization: strip leading/trailing whitespace from each line

@@ -1,5 +1,7 @@
 import google.generativeai as genai
 import json
+import asyncio
+import concurrent.futures
 from .preprocessor import CodePreprocessor
 from ..utils.config import config_manager
 from ..utils.cache import cache
@@ -70,14 +72,21 @@ class GeminiSecurityAnalyzer:
         prompt = SECURITY_ANALYSIS_PROMPT.format(code=code)
         
         try:
-            response = await self.model.generate_content_async(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=config_manager.get("gemini.temperature"),
-                    max_output_tokens=config_manager.get("gemini.max_tokens"),
-                    response_mime_type="application/json"
+            # Use thread pool executor to run the synchronous version
+            # This avoids issues with eventlet and Google API's async implementation
+            loop = asyncio.get_event_loop()
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                response = await loop.run_in_executor(
+                    executor,
+                    lambda: self.model.generate_content(
+                        prompt,
+                        generation_config=genai.types.GenerationConfig(
+                            temperature=config_manager.get("gemini.temperature"),
+                            max_output_tokens=config_manager.get("gemini.max_tokens"),
+                            response_mime_type="application/json"
+                        )
+                    )
                 )
-            )
             
             # Clean the response text to ensure it's valid JSON
             cleaned_response_text = response.text.strip()
